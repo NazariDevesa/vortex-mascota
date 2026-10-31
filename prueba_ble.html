@@ -30,17 +30,33 @@ function anotar(texto) {
   registro.scrollTop = registro.scrollHeight;
 }
 
+// Describe un error con todo lo que traiga (en Bluefy a veces no trae `message`).
+function describir(e) {
+  if (!e) return String(e);
+  return [e.name, e.message, e.code, String(e)].filter(x => x !== undefined && x !== '').join(' | ');
+}
+
+// Escribe sin esperar respuesta si el navegador lo permite (Bluefy puede no tenerlo).
+async function escribir(car, texto) {
+  const datos = new TextEncoder().encode(texto);
+  if (car.writeValueWithoutResponse) return car.writeValueWithoutResponse(datos);
+  return car.writeValue(datos);
+}
+
 document.getElementById('conectar').onclick = async () => {
+  let paso = 'buscar el robot';
   try {
     const disp = await navigator.bluetooth.requestDevice({
       filters: [{ name: 'Vortex' }], optionalServices: [SERVICIO] });
+    paso = 'conectar';
     const servidor = await disp.gatt.connect();
+    paso = 'abrir el servicio';
     const servicio = await servidor.getPrimaryService(SERVICIO);
     serie = await servicio.getCharacteristic(SERIE);
     const ordenes = await servicio.getCharacteristic(ORDENES);
-    const cod = new TextEncoder();
-    await ordenes.writeValueWithoutResponse(cod.encode('AT+PASSWOR=DFRobot\r\n'));
-    await ordenes.writeValueWithoutResponse(cod.encode('AT+CURRUART=9600\r\n'));
+    paso = 'configurar';
+    await escribir(ordenes, 'AT+PASSWOR=DFRobot\r\n');
+    await escribir(ordenes, 'AT+CURRUART=9600\r\n');
     anotar('Conectado a ' + disp.name);
     const dec = new TextDecoder();
     serie.addEventListener('characteristicvaluechanged',
@@ -49,18 +65,22 @@ document.getElementById('conectar').onclick = async () => {
       await serie.startNotifications();
       anotar('Avisos activados: esperando "hola N" del robot...');
     } catch (e) {
-      anotar('No se pueden activar los avisos: ' + e.message);
+      anotar('No se pueden activar los avisos: ' + describir(e));
     }
   } catch (e) {
-    anotar('Error: ' + e.message);
+    anotar('Error al ' + paso + ': ' + describir(e));
   }
 };
 
 for (const boton of document.querySelectorAll('[data-letra]')) {
   boton.onclick = async () => {
     if (!serie) { anotar('Primero conecta'); return; }
-    await serie.writeValueWithoutResponse(new TextEncoder().encode(boton.dataset.letra));
-    anotar('ENVIADO: ' + boton.dataset.letra);
+    try {
+      await escribir(serie, boton.dataset.letra);
+      anotar('ENVIADO: ' + boton.dataset.letra);
+    } catch (e) {
+      anotar('Error al enviar: ' + describir(e));
+    }
   };
 }
 
