@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prueba Bluetooth Vortex</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 16px; background: #fff; color: #222; }
+  button { font-size: 18px; padding: 10px 16px; margin: 4px; border-radius: 10px; border: 1px solid #888; }
+  #registro { white-space: pre-wrap; font-family: monospace; background: #f3f3f3; padding: 8px;
+              border-radius: 8px; height: 50vh; overflow-y: auto; }
+</style>
+</head>
+<body>
+<h1>Prueba Bluetooth Vortex</h1>
+<button id="conectar">Conectar</button>
+<button data-letra="r">Rojo</button>
+<button data-letra="v">Verde</button>
+<button data-letra="a">Azul</button>
+<p id="registro"></p>
+<script>
+// Servicio serie del Bluno (DFRobot): dfb0, característica dfb1 para los datos y
+// dfb2 para la configuración (contraseña y velocidad).
+const SERVICIO = 0xdfb0, SERIE = 0xdfb1, ORDENES = 0xdfb2;
+const registro = document.getElementById('registro');
+let serie = null;
+
+function anotar(texto) {
+  registro.textContent += texto + '\n';
+  registro.scrollTop = registro.scrollHeight;
+}
+
+document.getElementById('conectar').onclick = async () => {
+  try {
+    const disp = await navigator.bluetooth.requestDevice({
+      filters: [{ name: 'Vortex' }], optionalServices: [SERVICIO] });
+    const servidor = await disp.gatt.connect();
+    const servicio = await servidor.getPrimaryService(SERVICIO);
+    serie = await servicio.getCharacteristic(SERIE);
+    const ordenes = await servicio.getCharacteristic(ORDENES);
+    const cod = new TextEncoder();
+    await ordenes.writeValueWithoutResponse(cod.encode('AT+PASSWOR=DFRobot\r\n'));
+    await ordenes.writeValueWithoutResponse(cod.encode('AT+CURRUART=9600\r\n'));
+    anotar('Conectado a ' + disp.name);
+    const dec = new TextDecoder();
+    serie.addEventListener('characteristicvaluechanged',
+      e => anotar('RECIBIDO: ' + dec.decode(e.target.value)));
+    try {
+      await serie.startNotifications();
+      anotar('Avisos activados: esperando "hola N" del robot...');
+    } catch (e) {
+      anotar('No se pueden activar los avisos: ' + e.message);
+    }
+  } catch (e) {
+    anotar('Error: ' + e.message);
+  }
+};
+
+for (const boton of document.querySelectorAll('[data-letra]')) {
+  boton.onclick = async () => {
+    if (!serie) { anotar('Primero conecta'); return; }
+    await serie.writeValueWithoutResponse(new TextEncoder().encode(boton.dataset.letra));
+    anotar('ENVIADO: ' + boton.dataset.letra);
+  };
+}
+
+if (!navigator.bluetooth) {
+  anotar('Este navegador no tiene Bluetooth web. Usa Chrome o Edge (en iPad, Bluefy).');
+}
+</script>
+</body>
+</html>
