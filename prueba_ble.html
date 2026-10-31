@@ -12,7 +12,7 @@
 </style>
 </head>
 <body>
-<h1>Prueba Bluetooth Vortex</h1>
+<h1>Prueba Bluetooth Vortex <small>(versión 3)</small></h1>
 <button id="conectar">Conectar</button>
 <button data-letra="r">Rojo</button>
 <button data-letra="v">Verde</button>
@@ -21,7 +21,10 @@
 <script>
 // Servicio serie del Bluno (DFRobot): dfb0, característica dfb1 para los datos y
 // dfb2 para la configuración (contraseña y velocidad).
-const SERVICIO = 0xdfb0, SERIE = 0xdfb1, ORDENES = 0xdfb2;
+// UUID completos: Bluefy no siempre entiende los cortos (0xdfb0).
+const SERVICIO = '0000dfb0-0000-1000-8000-00805f9b34fb',
+      SERIE    = '0000dfb1-0000-1000-8000-00805f9b34fb',
+      ORDENES  = '0000dfb2-0000-1000-8000-00805f9b34fb';
 const registro = document.getElementById('registro');
 let serie = null;
 
@@ -84,6 +87,7 @@ for (const boton of document.querySelectorAll('[data-letra]')) {
   };
 }
 
+anotar('Versión 3 cargada. Navegador: ' + navigator.userAgent);
 if (!navigator.bluetooth) {
   anotar('Este navegador no tiene Bluetooth web. Usa Chrome o Edge (en iPad, Bluefy).');
 }
